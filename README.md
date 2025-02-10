@@ -25,7 +25,7 @@ Se eligió **Random Forest** debido a su capacidad para manejar datos complejos 
 La matriz de confusión muestra el desempeño del modelo clasificando casos de fraude (clase 1) y no fraude (clase 0).  
 The confusion matrix shows the model's performance in classifying fraud cases (class 1) and non-fraud cases (class 0).
 
-![Matriz de Confusión / Confusion Matrix](https://github.com/RicardoRobledo/CreditCardFraudDetector/blob/main/matrix.png)
+<img src="https://github.com/RicardoRobledo/CreditCardFraudDetector/blob/main/matrix.png" alt="Matriz de Confusión / Confusion Matrix" width="400" height="300">
 
 ---
 

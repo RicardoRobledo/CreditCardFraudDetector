@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detección de Fraudes Bancarios</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* Estilos generales */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7fc;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #fff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+        .container:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+        }
+        h1 {
+            color: #3498db;
+        }
+        #file-name {
+            margin-top: 10px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        #analyze-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease-in-out, transform 0.2s ease;
+        }
+        #analyze-btn:hover {
+            background-color: #27ae60;
+            transform: scale(1.1);
+        }
+        #results {
+            margin-top: 20px;
+        }
+
+        /* Estilo de las tarjetas */
+        .card {
+            margin: 10px auto;
+            padding: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            text-align: left;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: slideIn 0.5s forwards;
+        }
+        .card h4 {
+            margin: 0 0 10px;
+            color: #2c3e50;
+        }
+        .card p {
+            margin: 0;
+            color: #34495e;
+        }
+        .fraud {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .non-fraud {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        /* Animaciones */
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-15px);
+            }
+            60% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .container:hover h1 {
+            animation: bounce 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Detección de Fraudes Bancarios</h1>
+        <p>Sube tu archivo Excel para analizar posibles fraudes</p>
+        <input type="file" id="file-input" accept=".xlsx, .xls">
+        <p id="file-name"></p>
+        <button id="analyze-btn" disabled>Analizar datos</button>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const fileInput = document.getElementById("file-input");
+            const fileName = document.getElementById("file-name");
+            const analyzeButton = document.getElementById("analyze-btn");
+            const resultsDiv = document.getElementById("results");
+            const requiredColumns = ['V14', 'V10', 'V4', 'V17', 'V16', 'V12', 'V3', 'V9', 'V2', 'V11'];
+
+            let jsonData = null;
+
+            // Leer archivo Excel
+            fileInput.addEventListener("change", (event) => {
+                const file = event.target.files[0];
+                if (file && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls"))) {
+                    fileName.textContent = `Archivo seleccionado: ${file.name}`;
+                    readExcel(file);
+                } else {
+                    fileName.textContent = "Por favor, selecciona un archivo Excel válido.";
+                    analyzeButton.disabled = true;
+                }
+            });
+
+            // Leer y procesar archivo Excel
+            function readExcel(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: "array" });
+
+                    // Leer la primera hoja del archivo
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+
+                    // Convertir a JSON
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    const headers = rows[0]; // Primera fila como encabezados
+                    const body = rows.slice(1); // El resto son datos
+
+                    // Validar columnas requeridas
+                    if (!requiredColumns.every((col) => headers.includes(col))) {
+                        alert("El archivo Excel no contiene todas las columnas requeridas.");
+                        jsonData = null;
+                        analyzeButton.disabled = true;
+                        return;
+                    }
+
+                    // Crear JSON con columnas requeridas
+                    const filteredData = body.map((row) => {
+                        const filteredRow = {};
+                        requiredColumns.forEach((col) => {
+                            const colIndex = headers.indexOf(col);
+                            filteredRow[col] = row[colIndex];
+                        });
+                        return filteredRow;
+                    });
+
+                    jsonData = filteredData;
+                    analyzeButton.disabled = false;
+                };
+
+                reader.readAsArrayBuffer(file);
+            }
+
+            // Enviar datos al backend
+            analyzeButton.addEventListener("click", () => {
+                if (!jsonData) {
+                    alert("Por favor, carga un archivo válido antes de analizar.");
+                    return;
+                }
+
+                fetch("/analyze", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ data: jsonData }),
+                })
+                    .then((response) => {
+                        if (!response.ok) {
+                            throw new Error("Error al analizar los datos.");
+                        }
+                        return response.json();
+                    })
+                    .then((data) => {
+                        displayResults(data);
+                    })
+                    .catch((error) => {
+                        resultsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                    });
+            });
+
+            // Mostrar resultados en tarjetas
+            function displayResults(data) {
+                resultsDiv.innerHTML = `
+                    <h3>Resultados del Análisis</h3>
+                    <p><strong>Total de transacciones:</strong> ${data.total_transactions}</p>
+                    <p><strong>Casos de fraude detectados:</strong> ${data.fraud_cases}</p>
+                    <div id="transaction-cards"></div>
+                `;
+
+                const transactionCards = document.getElementById("transaction-cards");
+                data.predictions.forEach((prediction, index) => {
+                    const card = document.createElement("div");
+                    card.className = `card ${prediction === 1 ? "fraud" : "non-fraud"}`;
+                    card.style.animationDelay = `${index * 0.1}s`; // Animación escalonada
+                    card.innerHTML = `
+                        <h4>Transacción ${index + 1}</h4>
+                        <p><strong>Estado:</strong> ${prediction === 1 ? "Fraude" : "No Fraude"}</p>
+                    `;
+                    transactionCards.appendChild(card);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
